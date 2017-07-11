@@ -2,6 +2,45 @@ package main
 
 import "time"
 
+type AllPlay struct {
+	Result struct {
+		Event string `json:"event"`
+		EventCode string `json:"eventCode"`
+		EventTypeID string `json:"eventTypeId"`
+		Description string `json:"description"`
+	} `json:"result"`
+	About struct {
+		EventIdx int `json:"eventIdx"`
+		EventID int `json:"eventId"`
+		Period int `json:"period"`
+		PeriodType string `json:"periodType"`
+		OrdinalNum string `json:"ordinalNum"`
+		PeriodTime string `json:"periodTime"`
+		PeriodTimeRemaining string `json:"periodTimeRemaining"`
+		DateTime time.Time `json:"dateTime"`
+		Goals struct {
+			Away int `json:"away"`
+			Home int `json:"home"`
+		} `json:"goals"`
+	} `json:"about"`
+	Coordinates struct {
+	} `json:"coordinates"`
+	Players []struct {
+		Player struct {
+			ID int `json:"id"`
+			FullName string `json:"fullName"`
+			Link string `json:"link"`
+		} `json:"player"`
+		PlayerType string `json:"playerType"`
+	} `json:"players,omitempty"`
+	Team struct {
+		ID int `json:"id"`
+		Name string `json:"name"`
+		Link string `json:"link"`
+		TriCode string `json:"triCode"`
+	} `json:"team,omitempty"`
+}
+
 type Player struct {
 	Active             bool   `json:"active"`
 	AlternateCaptain   bool   `json:"alternateCaptain"`
@@ -192,44 +231,7 @@ type NHL struct {
 	Link     string `json:"link"`
 	LiveData struct {
 		Plays struct {
-			AllPlays []struct {
-				Result struct {
-					Event string `json:"event"`
-					EventCode string `json:"eventCode"`
-					EventTypeID string `json:"eventTypeId"`
-					Description string `json:"description"`
-				} `json:"result"`
-				About struct {
-					EventIdx int `json:"eventIdx"`
-					EventID int `json:"eventId"`
-					Period int `json:"period"`
-					PeriodType string `json:"periodType"`
-					OrdinalNum string `json:"ordinalNum"`
-					PeriodTime string `json:"periodTime"`
-					PeriodTimeRemaining string `json:"periodTimeRemaining"`
-					DateTime time.Time `json:"dateTime"`
-					Goals struct {
-						Away int `json:"away"`
-						Home int `json:"home"`
-					} `json:"goals"`
-				} `json:"about"`
-				Coordinates struct {
-				} `json:"coordinates"`
-				Players []struct {
-					Player struct {
-						ID int `json:"id"`
-						FullName string `json:"fullName"`
-						Link string `json:"link"`
-					} `json:"player"`
-					PlayerType string `json:"playerType"`
-				} `json:"players,omitempty"`
-				Team struct {
-					ID int `json:"id"`
-					Name string `json:"name"`
-					Link string `json:"link"`
-					TriCode string `json:"triCode"`
-				} `json:"team,omitempty"`
-			} `json:"allPlays"`
+			AllPlays []AllPlay `json:"allPlays"`
 			ScoringPlays []int `json:"scoringPlays"`
 			PenaltyPlays []int `json:"penaltyPlays"`
 			PlaysByPeriod []struct {

@@ -15,12 +15,19 @@ import (
 var db *sql.DB
 var err error
 
-
+// channels
+var token = make(chan struct{}, 100)
+var wait = make(chan struct{})
+var urls = make(chan string)
+var records = make(chan *NHL)
+var events = make(chan *AllPlay)
+var recordToken = make(chan struct{}, 100)
 
 func main() {
-	//url := os.Args[1]
-	// Build the request
+	// Setup DB Connection
 	db, err = sql.Open("mysql", "root:agrajag@/nhl")
+	db.SetMaxOpenConns(1000)
+	db.SetMaxIdleConns(1000)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -30,36 +37,72 @@ func main() {
 	}
 	defer db.Close()
 
-	ch := make(chan NHL)
-	for gameId := 2016020001; gameId < 2016021231; gameId++ {
-		url := "http://statsapi.web.nhl.com/api/v1/game/" + strconv.Itoa(gameId) + "/feed/live/"
-		fmt.Println(url)
-		go fetch(url, ch)
-	}
+	// URLS
+	go func() {
+		for gameId := 2016020001; gameId < 2016021231; gameId++ {
+			url := "http://statsapi.web.nhl.com/api/v1/game/" + strconv.Itoa(gameId) + "/feed/live/"
+			fmt.Println(url)
+			urls <- url
+		}
+		close(urls)
+	}()
+	fmt.Println("Inbetween URLS and Fethcer")
+	// Fetcher
+	go func() {
+		fmt.Println("Start of Fetcher")
+		for {
+			url, ok := <- urls
+			if !ok {
+				fmt.Println("not ok")
+				break
+			}
+			recordToken <- struct{}{}
+			go func() {
+				records <- fetch(url)
+				<-recordToken
+			}()
+		}
+		fmt.Println("Closed?")
+		close(records)
+	}()
+	fmt.Println("Inbetween Fetcher and Events")
 
-	for gameId := 2016020001; gameId < 2016021231; gameId++ {
-		// handle channel return
-		record := <-ch
-		for _, element := range record.LiveData.Plays.AllPlays {
-			/*fmt.Println("Event id: ", element.About.EventID)
-			fmt.Println("eventIdx: ", element.About.EventIdx)
-			fmt.Println("Description: ", element.Result.Description)
-			fmt.Println("Event: ", element.Result.Event)
-			fmt.Println("eventCode: ", element.Result.EventCode)
-			fmt.Println("eventTypeId: ", element.Result.EventTypeID, "\n")*/
-			_, err = db.Exec("INSERT INTO event (event_type_id) VALUES (?)", element.Result.EventTypeID)
-			if err != nil {
-				panic(err.Error())
+	// Events
+	go func() {
+		for record := range records{
+			for _, allPlay := range record.LiveData.Plays.AllPlays {
+				events <-&allPlay
 			}
 		}
-	}
+		close(events)
+	}()
+
+	// DB
+	go func() {
+		for event := range events {
+			token <-struct{}{}
+			go func() {
+				_, err = db.Exec("INSERT INTO event (event_type_id) VALUES (?)", event.Result.EventTypeID)
+				if err != nil {
+					panic(err.Error())
+				}
+				<-token
+			}()
+
+
+		}
+		wait <-struct{}{}
+	}()
+
+
+	<-wait
 }
 
-func fetch(url string, ch chan<- NHL) {
+func fetch(url string) *NHL {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Fatal("NewRequest: ", err)
-		return
+		return nil
 	}
 
 	// For control over HTTP client headers,
@@ -74,7 +117,7 @@ func fetch(url string, ch chan<- NHL) {
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatal("Do: ", err)
-		return
+		return nil
 	}
 
 	// Callers should close resp.Body
@@ -88,5 +131,5 @@ func fetch(url string, ch chan<- NHL) {
 	if err := json.NewDecoder(resp.Body).Decode(&record); err != nil {
 		log.Println(err)
 	}
-	ch<- record
+	return &record
 }
